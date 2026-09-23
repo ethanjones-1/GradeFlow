@@ -325,7 +325,7 @@ export default function App() {
               {sortedSummaryModules.length === 0 ? (
                 <p className="text-xs text-slate-400 italic">No modules added yet. Click 'Add Module' to start.</p>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-hidden">
                   <div className="strategy-grid">
                     <div className="strategy-columns">
                       <span>Module Name</span>
@@ -336,23 +336,23 @@ export default function App() {
                     <div className="space-y-1.5">
                       {sortedSummaryModules.map((mod) => (
                         <div key={mod.id} className={`strategy-row ${getGradeStatusStyle(mod.currentAverage, mod.modTarget)}`}>
-                      <div className="flex items-center gap-2 overflow-hidden pr-2">
+                      <div className="module-name-cell">
                         <span className="font-bold uppercase truncate text-slate-900 dark:text-slate-100">{mod.name}</span>
                         <span className="shrink-0 text-[10px] font-semibold text-slate-500 dark:text-slate-300">({mod.catts} CATs)</span>
                       </div>
 
                       {mod.assessments.length > 0 && mod.assessments.every((assessment) => assessment.grade !== '' && assessment.grade !== null) ? (
-                        <div className="flex items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        <div className="strategy-complete-badge">
                           <CheckCircle2 size={13} />
                           Complete
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white/90 px-2 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <div className="strategy-target-cell">
                           <input
                             type="number"
                             value={mod.targetGrade !== undefined && mod.targetGrade !== '' ? mod.targetGrade : 70}
                             onChange={(e) => updateModuleTargetFromTable(mod.id, e.target.value)}
-                            className="w-8 bg-transparent text-center text-xs font-black text-emerald-600 outline-none dark:text-emerald-400"
+                            className="w-7 min-w-0 bg-transparent text-center text-xs font-black text-emerald-600 outline-none dark:text-emerald-400 sm:w-8"
                           />
                           <span className="text-[10px] font-bold text-emerald-600">%</span>
                         </div>
@@ -472,8 +472,8 @@ export default function App() {
             </div>
 
             <form onSubmit={handleCreateModule} className="modal-form">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-2">
+              <div className="summary-form-grid">
+                <div className="summary-form-name">
                   <label className="mb-1 block font-bold uppercase tracking-wider text-[10px] text-slate-700 dark:text-slate-200">Module Name</label>
                   <input
                     type="text"

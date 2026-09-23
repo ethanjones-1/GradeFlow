@@ -55,13 +55,13 @@
   }
 
   .strategy-grid {
-    @apply min-w-[460px];
+    @apply min-w-0;
   }
 
   .strategy-columns,
   .strategy-row,
   .strategy-totals {
-    @apply grid grid-cols-[minmax(0,1fr)_100px_120px] items-center gap-2;
+    @apply grid grid-cols-[minmax(0,1fr)_82px_92px] items-center gap-1 sm:grid-cols-[minmax(0,1fr)_100px_120px] sm:gap-2;
   }
 
   .strategy-columns {
@@ -86,6 +86,26 @@
 
   .module-summary {
     @apply mt-3 grid grid-cols-1 items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:grid-cols-[minmax(0,1fr)_150px_150px_170px] sm:gap-4;
+  }
+
+  .module-name-cell {
+    @apply flex min-w-0 items-center gap-2 overflow-hidden pr-1;
+  }
+
+  .strategy-target-cell {
+    @apply flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white/90 px-1.5 py-1 shadow-sm dark:border-slate-700 dark:bg-slate-800;
+  }
+
+  .strategy-complete-badge {
+    @apply flex items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 sm:px-2 sm:text-[10px];
+  }
+
+  .summary-form-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-3;
+  }
+
+  .summary-form-name {
+    @apply sm:col-span-2;
   }
 
   .module-details {
