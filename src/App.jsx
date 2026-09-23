@@ -254,7 +254,7 @@ export default function App() {
             <div className="brand-mark">
               <GraduationCap size={18} />
             </div>
-            <h1 className="text-sm font-bold tracking-wider uppercase text-slate-900 dark:text-white">Grade Tracker</h1>
+            <h1 className="text-sm font-bold tracking-wider uppercase text-slate-900 dark:text-white">GradeFlow</h1>
           </div>
 
           <div className="flex items-center gap-2">
