@@ -1,0 +1,437 @@
+
+import { useEffect, useMemo, useState } from 'react'
+import { CheckCircle2, GraduationCap, Plus, Trash2, X } from 'lucide-react'
+
+function getGradeStatusStyle(avg, target) {
+  if (avg === null) return 'bg-slate-50 text-slate-500 border-slate-200'
+  if (avg >= target) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+  if (avg >= target - 5) return 'bg-amber-50 text-amber-700 border-amber-200'
+  return 'bg-red-50 text-red-700 border-red-200'
+}
+
+export default function App() {
+  const [modules, setModules] = useState(() => {
+    try {
+      const saved = localStorage.getItem('gradeflow-modules')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [newModule, setNewModule] = useState({
+    name: '',
+    catts: '15',
+    targetGrade: '70',
+    assessments: [{ name: 'cw1', weight: '50', grade: '' }, { name: 'exam', weight: '50', grade: '' }],
+  })
+
+  useEffect(() => {
+    localStorage.setItem('gradeflow-modules', JSON.stringify(modules))
+  }, [modules])
+
+  const processedModules = useMemo(() => {
+    return modules.map((mod) => {
+      const modTarget = mod.targetGrade !== undefined && mod.targetGrade !== '' ? Number(mod.targetGrade) : 70
+      const graded = mod.assessments.filter((a) => a.grade !== '' && a.grade !== null)
+      const ungraded = mod.assessments.filter((a) => a.grade === '' || a.grade === null)
+
+      const totalWeight = mod.assessments.reduce((sum, a) => sum + Number(a.weight), 0)
+      const gradedWeight = graded.reduce((sum, a) => sum + Number(a.weight), 0)
+      const remainingWeight = ungraded.reduce((sum, a) => sum + Number(a.weight), 0)
+
+      const earnedGradeSum = graded.reduce((sum, a) => sum + Number(a.grade) * (Number(a.weight) / 100), 0)
+      
+      let currentAverage = null
+      if (gradedWeight > 0) {
+        currentAverage = graded.reduce((sum, a) => sum + Number(a.grade) * Number(a.weight), 0) / gradedWeight
+      }
+
+      let neededOnRemaining = null
+      if (remainingWeight > 0) {
+        neededOnRemaining = (modTarget - earnedGradeSum) / (remainingWeight / 100)
+      }
+
+      return {
+        ...mod,
+        catts: Number(mod.catts) || 15,
+        modTarget,
+        totalWeight,
+        currentAverage,
+        remainingWeight,
+        neededOnRemaining,
+      }
+    })
+  }, [modules])
+
+  // Automatically calculate Year Target as the CATs-weighted average of all module targets
+  const calculatedYearTarget = useMemo(() => {
+    if (processedModules.length === 0) return 70
+    const totalCatts = processedModules.reduce((sum, m) => sum + m.catts, 0)
+    if (totalCatts === 0) return 70
+    const weightedSum = processedModules.reduce((sum, m) => sum + m.modTarget * m.catts, 0)
+    return weightedSum / totalCatts
+  }, [processedModules])
+
+  const overallAverage = useMemo(() => {
+    const validMods = processedModules.filter((m) => m.currentAverage !== null)
+    if (validMods.length === 0) return null
+    const totalCatts = validMods.reduce((sum, m) => sum + m.catts, 0)
+    if (totalCatts === 0) return null
+    return validMods.reduce((sum, m) => sum + m.currentAverage * m.catts, 0) / totalCatts
+  }, [processedModules])
+
+  const sortedSummaryModules = useMemo(() => {
+    return [...processedModules].sort((a, b) => {
+      if (a.currentAverage === null) return 1
+      if (b.currentAverage === null) return -1
+      return b.currentAverage - a.currentAverage
+    })
+  }, [processedModules])
+
+  function updateModuleTargetFromTable(modId, val) {
+    setModules(
+      modules.map((m) => {
+        if (m.id !== modId) return m
+        return { ...m, targetGrade: val === '' ? '' : Number(val) }
+      })
+    )
+  }
+
+  function handleCreateModule(e) {
+    e.preventDefault()
+    const totalWeight = newModule.assessments.reduce((sum, a) => sum + Number(a.weight), 0)
+    if (totalWeight !== 100) {
+      alert(`Total weight must equal 100%. Currently: ${totalWeight}%`)
+      return
+    }
+
+    const moduleToSave = {
+      id: crypto.randomUUID(),
+      name: newModule.name.trim(),
+      catts: Number(newModule.catts) || 15,
+      targetGrade: newModule.targetGrade === '' ? 70 : Number(newModule.targetGrade),
+      assessments: newModule.assessments.map((a) => ({
+        id: crypto.randomUUID(),
+        name: a.name.trim(),
+        weight: Number(a.weight),
+        grade: a.grade === '' ? '' : Number(a.grade),
+      })),
+    }
+
+    setModules([...modules, moduleToSave])
+    setIsModalOpen(false)
+    setNewModule({
+      name: '',
+      catts: '15',
+      targetGrade: '70',
+      assessments: [{ name: 'cw1', weight: '50', grade: '' }, { name: 'exam', weight: '50', grade: '' }],
+    })
+  }
+
+  function updateGrade(modId, assessmentId, gradeVal) {
+    setModules(
+      modules.map((m) => {
+        if (m.id !== modId) return m
+        return {
+          ...m,
+          assessments: m.assessments.map((a) => (a.id === assessmentId ? { ...a, grade: gradeVal === '' ? '' : Number(gradeVal) } : a)),
+        }
+      })
+    )
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 text-slate-900 pb-20 font-sans">
+      <style>{`
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+      `}</style>
+
+      <header className="border-b border-slate-200 bg-white shadow-sm sticky top-0 z-10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md">
+              <GraduationCap size={18} />
+            </div>
+            <h1 className="text-sm font-bold tracking-wider uppercase text-slate-800">Grade Tracker</h1>
+          </div>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-md"
+          >
+            <Plus size={14} /> Add Module
+          </button>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-6xl px-6 pt-8">
+        {/* Top Summary & Dashboard Stats Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="space-y-4">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Generated Year Target</p>
+              <p className="text-3xl font-black text-emerald-600 mt-1">{calculatedYearTarget.toFixed(1)}%</p>
+              <p className="text-[10px] text-slate-400 mt-1">Weighted average of module targets</p>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Current Overall Average</p>
+              <div className={`mt-2 inline-block px-3 py-1 rounded-xl text-2xl font-black border ${getGradeStatusStyle(overallAverage, calculatedYearTarget)}`}>
+                {overallAverage === null ? '—' : `${overallAverage.toFixed(1)}%`}
+              </div>
+            </div>
+          </div>
+
+          {/* Master Summary Table where Module Targets are edited */}
+          <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Module Strategy Table (Highest to Lowest)</h3>
+                <span className="text-[10px] text-slate-400 font-medium">Edit individual targets per row</span>
+              </div>
+
+              {sortedSummaryModules.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No modules added yet. Click 'Add Module' to start.</p>
+              ) : (
+                <div className="space-y-2">
+                  {sortedSummaryModules.map((mod) => (
+                    <div key={mod.id} className={`flex items-center justify-between text-xs py-2 px-3.5 rounded-xl border transition ${getGradeStatusStyle(mod.currentAverage, mod.modTarget)}`}>
+                      <div className="flex items-center gap-3">
+                        <span className="font-bold text-slate-800">{mod.name}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold">({mod.catts} CATs)</span>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1 bg-white/80 border border-slate-200 px-2 py-0.5 rounded-lg shadow-sm">
+                          <span className="text-[10px] font-bold text-slate-400">Target:</span>
+                          <input
+                            type="number"
+                            value={mod.targetGrade !== undefined && mod.targetGrade !== '' ? mod.targetGrade : 70}
+                            onChange={(e) => updateModuleTargetFromTable(mod.id, e.target.value)}
+                            className="w-10 bg-transparent font-black text-emerald-600 text-center outline-none"
+                          />
+                          <span className="text-[10px] font-bold text-emerald-600">%</span>
+                        </div>
+
+                        <span className="font-black min-w-[45px] text-right">{mod.currentAverage === null ? '—' : `${mod.currentAverage.toFixed(1)}%`}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold">
+              <span className="text-slate-500 uppercase tracking-wider text-[10px]">Overall Weighted Average</span>
+              <div className={`px-2.5 py-1 rounded-lg text-xs font-black border ${getGradeStatusStyle(overallAverage, calculatedYearTarget)}`}>
+                {overallAverage === null ? '—' : `${overallAverage.toFixed(1)}%`}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Full Module Cards */}
+        <div className="space-y-6">
+          {processedModules.map((mod) => (
+            <div key={mod.id} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-base font-extrabold text-slate-900 uppercase tracking-wide">{mod.name}</h2>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{mod.catts} CATs</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">Target: {mod.modTarget}%</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">Total Weight: {mod.totalWeight}%</span>
+                </div>
+                <button onClick={() => setModules(modules.filter((m) => m.id !== mod.id))} className="text-slate-400 hover:text-red-500 transition p-1">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start text-xs">
+                <div className="md:col-span-2 space-y-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Components & Grades</div>
+                  {mod.assessments.map((a) => {
+                    const isDone = a.grade !== '' && a.grade !== null
+                    return (
+                      <div key={a.id} className={`flex items-center justify-between px-3.5 py-2.5 rounded-2xl border transition ${isDone ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200/80'}`}>
+                        <div className="flex items-center gap-2.5">
+                          <div className={`flex h-5 w-5 items-center justify-center rounded-full ${isDone ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-transparent'}`}>
+                            <CheckCircle2 size={12} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800">{a.name} <span className="text-slate-400 font-normal">({a.weight}%)</span></p>
+                            {!isDone && mod.neededOnRemaining !== null && (
+                              <p className="text-[10px] font-semibold text-amber-600 mt-0.5">Need min: {mod.neededOnRemaining.toFixed(1)}%</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            placeholder="—"
+                            value={a.grade}
+                            onChange={(e) => updateGrade(mod.id, a.id, e.target.value)}
+                            className="w-14 bg-white border border-slate-200 px-2 py-1 rounded-xl text-center font-bold text-slate-900 outline-none focus:border-emerald-500 shadow-sm"
+                          />
+                          <span className="text-slate-400 font-bold">%</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                      <span>Current Average</span>
+                      <span className="text-slate-500">Target: {mod.modTarget}%</span>
+                    </div>
+                    <div className={`inline-block px-3 py-1 rounded-xl text-xl font-black border ${getGradeStatusStyle(mod.currentAverage, mod.modTarget)}`}>
+                      {mod.currentAverage === null ? '—' : `${mod.currentAverage.toFixed(1)}%`}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Target Requirements</div>
+                    {mod.remainingWeight > 0 && mod.neededOnRemaining !== null ? (
+                      <p className="font-bold text-xs text-slate-700">
+                        Need <strong className={mod.neededOnRemaining > 100 ? 'text-red-600' : 'text-emerald-700'}>{mod.neededOnRemaining.toFixed(1)}%</strong> avg on remaining ({mod.remainingWeight}%)
+                      </p>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-emerald-600 font-bold text-xs">
+                        <CheckCircle2 size={15} /> All complete!
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-slate-900">Add New Module & Weights</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleCreateModule} className="space-y-4 text-xs">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block font-bold text-slate-700 mb-1 uppercase tracking-wider text-[10px]">Module Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 130 S+P"
+                    value={newModule.name}
+                    onChange={(e) => setNewModule({ ...newModule, name: e.target.value })}
+                    className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-slate-900 font-medium outline-none focus:border-emerald-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1 uppercase tracking-wider text-[10px]">CATs</label>
+                  <input
+                    type="number"
+                    value={newModule.catts}
+                    onChange={(e) => setNewModule({ ...newModule, catts: e.target.value })}
+                    className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5 text-slate-900 text-center font-bold outline-none focus:border-emerald-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1 uppercase tracking-wider text-[10px]">Module Target %</label>
+                <input
+                  type="number"
+                  value={newModule.targetGrade}
+                  onChange={(e) => setNewModule({ ...newModule, targetGrade: e.target.value })}
+                  className="w-full rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-slate-900 font-bold outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Components (Must total 100%)</span>
+                  <button
+                    type="button"
+                    onClick={() => setNewModule({ ...newModule, assessments: [...newModule.assessments, { name: '', weight: '', grade: '' }] })}
+                    className="text-emerald-600 font-bold hover:underline"
+                  >
+                    + Add Part
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {newModule.assessments.map((a, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Name (e.g. cw1)"
+                        value={a.name}
+                        onChange={(e) => {
+                          const updated = [...newModule.assessments]
+                          updated[index].name = e.target.value
+                          setNewModule({ ...newModule, assessments: updated })
+                        }}
+                        className="flex-1 rounded-xl bg-slate-50 border border-slate-200 px-3 py-2 text-slate-900 outline-none focus:border-emerald-500"
+                        required
+                      />
+                      <input
+                        type="number"
+                        placeholder="Wt %"
+                        value={a.weight}
+                        onChange={(e) => {
+                          const updated = [...newModule.assessments]
+                          updated[index].weight = e.target.value
+                          setNewModule({ ...newModule, assessments: updated })
+                        }}
+                        className="w-16 rounded-xl bg-slate-50 border border-slate-200 px-2 py-2 text-slate-900 text-center font-bold outline-none focus:border-emerald-500"
+                        required
+                      />
+                      <input
+                        type="number"
+                        placeholder="Grade"
+                        value={a.grade}
+                        onChange={(e) => {
+                          const updated = [...newModule.assessments]
+                          updated[index].grade = e.target.value
+                          setNewModule({ ...newModule, assessments: updated })
+                        }}
+                        className="w-16 rounded-xl bg-slate-50 border border-slate-200 px-2 py-2 text-slate-900 text-center font-bold outline-none focus:border-emerald-500"
+                      />
+                      {newModule.assessments.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setNewModule({ ...newModule, assessments: newModule.assessments.filter((_, i) => i !== index) })}
+                          className="text-slate-400 hover:text-red-500 p-1"
+                        >
+                          <X size5={15} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition mt-2"
+              >
+                Save Module
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </main>
+  )
+}
